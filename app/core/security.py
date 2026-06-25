@@ -1,5 +1,15 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
+import sys
+
+# Patch for Python 3.12+ compatibility since 'imp' was removed
+try:
+    import imp
+except ImportError:
+    import types
+    imp_module = types.ModuleType('imp')
+    sys.modules['imp'] = imp_module
+
 from jose import jwt
 from passlib.context import CryptContext
 from app.core.config import settings
