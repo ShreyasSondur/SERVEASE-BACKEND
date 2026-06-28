@@ -142,4 +142,4 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         )
         
         # Redirect back to frontend with token
-        return RedirectResponse(f"http://localhost:3000/login?token={token}")
+        return RedirectResponse(f"{settings.FRONTEND_HOST}/login?token={token}")

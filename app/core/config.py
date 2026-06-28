@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None
     SERVER_HOST: str = "http://localhost:8000"
+    FRONTEND_HOST: str = "http://localhost:3000"
     
     model_config = {
         "case_sensitive": True,
