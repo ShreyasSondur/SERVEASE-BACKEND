@@ -47,10 +47,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Set all CORS enabled origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        settings.FRONTEND_HOST,
+        "https://www.servizuae.com",
+        "https://servizuae.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
