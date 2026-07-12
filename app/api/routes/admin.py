@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.api.dependencies import get_db, get_current_active_admin, get_current_active_mod
 from app.models.user import User, UserRole
 from app.models.partner import PartnerProfile, PartnerStatus
@@ -36,7 +36,7 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: User = Depe
 # -----------------
 @router.get("/partners", response_model=List[PartnerProfileSchema])
 def list_partners(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_mod)):
-    partners = db.query(PartnerProfile).offset(skip).limit(limit).all()
+    partners = db.query(PartnerProfile).options(joinedload(PartnerProfile.user)).offset(skip).limit(limit).all()
     return partners
 
 @router.get("/partners/{partner_id}", response_model=PartnerProfileSchema)
@@ -267,6 +267,27 @@ def delete_emirate(
     db.commit()
     
     return {"detail": "Emirate deleted successfully"}
+
+@router.put("/emirates/{emirate_id}/toggle-visibility", response_model=dict)
+def toggle_emirate_visibility(
+    emirate_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
+    from app.models.catalog import Emirate
+    emirate = db.query(Emirate).filter(Emirate.id == emirate_id).first()
+    if not emirate:
+        raise HTTPException(status_code=404, detail="Emirate not found")
+    emirate.is_visible = not emirate.is_visible
+    db.commit()
+    db.refresh(emirate)
+    
+    # Log action
+    log = ActivityLog(user_id=current_admin.id, action="TOGGLE_EMIRATE_VISIBILITY", description=f"Toggled visibility of emirate '{emirate.name}' (ID: {emirate_id}) to {emirate.is_visible}")
+    db.add(log)
+    db.commit()
+    
+    return {"id": emirate.id, "name": emirate.name, "is_visible": emirate.is_visible}
 
 @router.delete("/cities/{city_id}", response_model=dict)
 def delete_city(

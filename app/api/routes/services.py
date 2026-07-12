@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.api.dependencies import get_db, get_current_active_partner, get_current_user_optional
 from app.models.user import User, UserRole
 from app.models.partner import PartnerProfile, PartnerStatus
@@ -17,7 +17,11 @@ def list_services(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     # Join with PartnerProfile to ensure only verified partners' services are shown
-    services = db.query(Service).join(PartnerProfile).filter(
+    services = db.query(Service).options(
+        joinedload(Service.city),
+        joinedload(Service.category),
+        joinedload(Service.partner)
+    ).join(PartnerProfile).filter(
         Service.is_active == True,
         Service.is_deleted == False,
         PartnerProfile.status == PartnerStatus.VERIFIED
@@ -111,7 +115,11 @@ def get_service(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    service = db.query(Service).filter(Service.id == service_id, Service.is_deleted == False).first()
+    service = db.query(Service).options(
+        joinedload(Service.city),
+        joinedload(Service.category),
+        joinedload(Service.partner)
+    ).filter(Service.id == service_id, Service.is_deleted == False).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found.")
         

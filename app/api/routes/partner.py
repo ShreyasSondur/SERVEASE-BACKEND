@@ -1,6 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.api.dependencies import get_db, get_current_user, get_current_active_partner
 from app.models.user import User, UserRole
 from app.models.partner import PartnerProfile, PartnerStatus
@@ -81,7 +81,11 @@ def get_partner_services(
     if not profile:
         raise HTTPException(status_code=404, detail="Partner profile not found.")
     
-    services = db.query(Service).filter(Service.partner_id == profile.id, Service.is_deleted == False).all()
+    services = db.query(Service).options(
+        joinedload(Service.city),
+        joinedload(Service.category),
+        joinedload(Service.partner)
+    ).filter(Service.partner_id == profile.id, Service.is_deleted == False).all()
     return services
 
 @router.post("/services", response_model=ServiceSchema)
@@ -154,7 +158,11 @@ def get_partner_deals(
     if not profile:
         raise HTTPException(status_code=404, detail="Partner profile not found.")
     
-    deals = db.query(Deal).filter(Deal.partner_id == profile.id, Deal.is_deleted == False).all()
+    deals = db.query(Deal).options(
+        joinedload(Deal.city),
+        joinedload(Deal.category),
+        joinedload(Deal.partner)
+    ).filter(Deal.partner_id == profile.id, Deal.is_deleted == False).all()
     return deals
 
 @router.post("/deals", response_model=DealSchema)

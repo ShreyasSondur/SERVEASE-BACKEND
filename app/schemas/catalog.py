@@ -10,6 +10,7 @@ class EmirateCreate(EmirateBase):
 
 class Emirate(EmirateBase):
     id: int
+    is_visible: bool = True
 
     class Config:
         from_attributes = True

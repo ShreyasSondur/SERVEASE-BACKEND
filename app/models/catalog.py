@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
@@ -7,6 +7,7 @@ class Emirate(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
+    is_visible = Column(Boolean, default=True, nullable=False)
 
     cities = relationship("City", back_populates="emirate")
 

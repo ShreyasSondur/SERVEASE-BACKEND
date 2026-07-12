@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.base_class import Base
 from app.db.session import engine
-from app.api.routes import auth, partner, services, deals, search, admin, catalog
+from app.api.routes import auth, partner, services, deals, search, admin, catalog, contact
 
 # Create database tables (For production, Alembic is recommended)
 Base.metadata.create_all(bind=engine)
@@ -12,6 +12,16 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure database columns for OTP exist
+    from app.db.session import engine
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP;"))
+    except Exception as e:
+        print(f"Error altering users table: {e}")
+
     # Initialize Admin User on startup
     from app.db.session import SessionLocal
     from app.models.user import User, UserRole
@@ -53,6 +63,7 @@ app.include_router(deals.router, prefix=f"{settings.API_V1_STR}/deals", tags=["d
 app.include_router(search.router, prefix=f"{settings.API_V1_STR}/search", tags=["search"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(catalog.router, prefix=f"{settings.API_V1_STR}/catalog", tags=["catalog"])
+app.include_router(contact.router, prefix=f"{settings.API_V1_STR}/contact", tags=["contact"])
 
 @app.get("/")
 def root():

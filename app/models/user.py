@@ -21,6 +21,8 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
     is_active = Column(Boolean, default=True)
     is_banned = Column(Boolean, default=False)
+    otp_code = Column(String, nullable=True)
+    otp_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     partner_profile = relationship("PartnerProfile", back_populates="user", uselist=False)

@@ -7,7 +7,12 @@ from app.core import security
 from app.core.config import settings
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, User as UserSchema
-from app.schemas.token import Token
+from app.schemas.token import Token, VerifyOTP, ResendOTP
+from jose import jwt
+from datetime import datetime, timezone
+import random
+import string
+from app.utils.email import send_otp_email
 
 router = APIRouter()
 
@@ -62,6 +67,27 @@ def login_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     
+    # Check if the user is an ADMIN
+    if user.role == UserRole.ADMIN:
+        # Generate 6-digit OTP
+        otp = "".join(random.choices(string.digits, k=6))
+        user.otp_code = otp
+        user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        db.commit()
+        
+        # Send OTP email
+        send_otp_email(settings.ADMIN_OTP_EMAIL, otp)
+        
+        # Create temp_token for OTP verification page session
+        expire = datetime.now(timezone.utc) + timedelta(minutes=10)
+        to_encode = {"exp": expire, "sub": str(user.id), "type": "temp_otp"}
+        temp_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        
+        return {
+            "requires_otp": True,
+            "temp_token": temp_token
+        }
+        
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": security.create_access_token(
@@ -69,6 +95,69 @@ def login_access_token(
         ),
         "token_type": "bearer",
     }
+
+@router.post("/verify-otp", response_model=Token)
+def verify_otp(data: VerifyOTP, db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(data.temp_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        token_type = payload.get("type")
+        if token_type != "temp_otp":
+            raise HTTPException(status_code=400, detail="Invalid token type")
+        user_id = payload.get("sub")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired temporary session")
+        
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.otp_code or user.otp_code != data.otp:
+        raise HTTPException(status_code=400, detail="Incorrect OTP")
+        
+    otp_expires = user.otp_expires_at
+    if otp_expires:
+        if otp_expires.tzinfo is None:
+            otp_expires = otp_expires.replace(tzinfo=timezone.utc)
+        if otp_expires < datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="OTP has expired")
+            
+    # Clear OTP
+    user.otp_code = None
+    user.otp_expires_at = None
+    db.commit()
+    
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return {
+        "access_token": security.create_access_token(
+            user.id, expires_delta=access_token_expires
+        ),
+        "token_type": "bearer",
+    }
+
+@router.post("/resend-otp")
+def resend_otp(data: ResendOTP, db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(data.temp_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        token_type = payload.get("type")
+        if token_type != "temp_otp":
+            raise HTTPException(status_code=400, detail="Invalid token type")
+        user_id = payload.get("sub")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired temporary session")
+        
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Generate new OTP
+    otp = "".join(random.choices(string.digits, k=6))
+    user.otp_code = otp
+    user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    db.commit()
+    
+    # Send email
+    send_otp_email(settings.ADMIN_OTP_EMAIL, otp)
+    
+    return {"message": "OTP resent successfully"}
 
 @router.get("/me", response_model=UserSchema)
 def read_users_me(current_user: User = Depends(get_current_user)):
@@ -78,16 +167,20 @@ from fastapi.responses import RedirectResponse
 import secrets
 
 @router.get("/google/login")
-def google_login():
+def google_login(prompt: str = None):
     client_id = settings.GOOGLE_CLIENT_ID
     if not client_id:
         raise HTTPException(status_code=500, detail="Google OAuth not configured")
         
     # Using frontend redirect URI for now, or backend
     redirect_uri = f"{settings.SERVER_HOST}/api/v1/auth/google/callback"
-    return RedirectResponse(
-        f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}&scope=openid%20email%20profile&access_type=offline"
-    )
+    
+    google_auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}&scope=openid%20email%20profile&access_type=offline"
+    
+    if prompt:
+        google_auth_url += f"&prompt={prompt}"
+        
+    return RedirectResponse(google_auth_url)
 
 @router.get("/google/callback")
 async def google_callback(code: str, db: Session = Depends(get_db)):

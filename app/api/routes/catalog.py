@@ -8,8 +8,11 @@ from app.schemas.catalog import Emirate as EmirateSchema, City as CitySchema, Ca
 router = APIRouter()
 
 @router.get("/emirates", response_model=List[EmirateSchema])
-def list_emirates(db: Session = Depends(get_db)):
-    return db.query(Emirate).all()
+def list_emirates(include_hidden: bool = False, db: Session = Depends(get_db)):
+    query = db.query(Emirate)
+    if not include_hidden:
+        query = query.filter(Emirate.is_visible == True)
+    return query.all()
 
 @router.get("/cities", response_model=List[CitySchema])
 def list_cities(emirate_id: Optional[int] = None, db: Session = Depends(get_db)):

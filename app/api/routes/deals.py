@@ -1,18 +1,18 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.api.dependencies import get_db, get_current_active_partner, get_current_user_optional
 from app.models.user import User, UserRole
 from app.models.partner import PartnerProfile, PartnerStatus
 from app.models.business import Deal, Service
-from app.schemas.business import Deal as DealSchema, DealCreate, DealUpdate
+from app.schemas.business import Deal as DealSchema, DealCreate, DealUpdate, PaginatedDealResponse
 
 router = APIRouter()
 
-@router.get("/", response_model=List[DealSchema])
+@router.get("/", response_model=PaginatedDealResponse)
 def list_deals(
-    skip: int = 0, 
-    limit: int = 100,
+    page: int = 1, 
+    limit: int = 10,
     emirate_id: int | None = None,
     city_id: int | None = None,
     category_id: int | None = None,
@@ -21,7 +21,11 @@ def list_deals(
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     # Join with PartnerProfile to ensure only verified partners' deals are shown
-    query = db.query(Deal).join(PartnerProfile).filter(
+    query = db.query(Deal).options(
+        joinedload(Deal.city),
+        joinedload(Deal.category),
+        joinedload(Deal.partner)
+    ).join(PartnerProfile).filter(
         Deal.is_active == True,
         Deal.is_deleted == False,
         PartnerProfile.status == PartnerStatus.VERIFIED
@@ -49,14 +53,15 @@ def list_deals(
     db.add(search_log)
     db.commit()
 
-    deals = query.offset(skip).limit(limit).all()
+    total = query.count()
+    deals = query.offset((page - 1) * limit).limit(limit).all()
     results = [DealSchema.model_validate(d) for d in deals]
     if not current_user:
         for d in results:
             if d.partner:
                 d.partner.phone = "HIDDEN_LOGIN_REQUIRED"
                 d.partner.email = "HIDDEN_LOGIN_REQUIRED"
-    return results
+    return {"items": results, "total": total}
 
 @router.post("/", response_model=DealSchema)
 def create_deal(
@@ -138,7 +143,11 @@ def get_deal(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    deal = db.query(Deal).filter(Deal.id == deal_id, Deal.is_deleted == False).first()
+    deal = db.query(Deal).options(
+        joinedload(Deal.city),
+        joinedload(Deal.category),
+        joinedload(Deal.partner)
+    ).filter(Deal.id == deal_id, Deal.is_deleted == False).first()
     if not deal:
         raise HTTPException(status_code=404, detail="Deal not found.")
         

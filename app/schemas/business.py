@@ -72,3 +72,13 @@ class Deal(DealBase):
 
     class Config:
         from_attributes = True
+
+
+class PaginatedServiceResponse(BaseModel):
+    items: List[Service]
+    total: int
+
+
+class PaginatedDealResponse(BaseModel):
+    items: List[Deal]
+    total: int
