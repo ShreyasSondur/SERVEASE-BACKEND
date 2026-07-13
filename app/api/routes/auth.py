@@ -200,7 +200,8 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
             },
         )
         if token_res.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to authenticate with Google")
+            error_details = token_res.text
+            raise HTTPException(status_code=400, detail=f"Failed to authenticate with Google: {error_details}")
             
         token_data = token_res.json()
         
