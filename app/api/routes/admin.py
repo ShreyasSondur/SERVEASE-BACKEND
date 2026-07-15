@@ -120,6 +120,14 @@ def ban_partner(partner_id: int, db: Session = Depends(get_db), current_user: Us
     return partner
 
 # -----------------
+# User Management (Admin Only)
+# -----------------
+@router.get("/users")
+def list_users(db: Session = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
+    users = db.query(User).filter(User.role == UserRole.USER).all()
+    return [{"id": u.id, "email": u.email, "full_name": u.full_name, "is_active": u.is_active} for u in users]
+
+# -----------------
 # Mod Management (Admin Only)
 # -----------------
 @router.get("/mods")

@@ -18,6 +18,7 @@ def search_services(
     city_id: Optional[int] = None,
     category_id: Optional[int] = None,
     q: Optional[str] = None,
+    sort: Optional[str] = None,
     page: int = 1,
     limit: int = 10,
     db: Session = Depends(get_db),
@@ -42,6 +43,11 @@ def search_services(
         query = query.filter(Service.category_id == category_id)
     if q:
         query = query.filter(Service.title.ilike(f"%{q}%"))
+
+    if sort == "alpha_asc":
+        query = query.order_by(Service.title.asc())
+    elif sort == "alpha_desc":
+        query = query.order_by(Service.title.desc())
 
     # Log the search with the authenticated user ID if available
     search_log = SearchHistory(

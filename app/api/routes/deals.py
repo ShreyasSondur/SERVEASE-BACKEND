@@ -17,6 +17,7 @@ def list_deals(
     city_id: int | None = None,
     category_id: int | None = None,
     q: str | None = None,
+    sort: str | None = None,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -40,6 +41,11 @@ def list_deals(
         query = query.filter(Deal.category_id == category_id)
     if q:
         query = query.filter(Deal.title.ilike(f"%{q}%"))
+
+    if sort == "alpha_asc":
+        query = query.order_by(Deal.title.asc())
+    elif sort == "alpha_desc":
+        query = query.order_by(Deal.title.desc())
 
     # Log the search in search history
     from app.models.analytics import SearchHistory

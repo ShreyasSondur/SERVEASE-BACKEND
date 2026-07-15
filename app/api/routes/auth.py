@@ -47,6 +47,7 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
         )
     user = User(
         email=user_in.email,
+        full_name=user_in.full_name,
         password_hash=security.get_password_hash(user_in.password),
         role=UserRole.USER,
     )
