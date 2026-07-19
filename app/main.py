@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.base_class import Base
 from app.db.session import engine
-from app.api.routes import auth, partner, services, deals, search, admin, catalog, contact
+from app.api.routes import auth, partner, services, deals, search, admin, catalog, contact, ads
 
 # Create database tables (For production, Alembic is recommended)
 Base.metadata.create_all(bind=engine)
@@ -67,6 +67,7 @@ app.include_router(search.router, prefix=f"{settings.API_V1_STR}/search", tags=[
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(catalog.router, prefix=f"{settings.API_V1_STR}/catalog", tags=["catalog"])
 app.include_router(contact.router, prefix=f"{settings.API_V1_STR}/contact", tags=["contact"])
+app.include_router(ads.router, prefix=f"{settings.API_V1_STR}/ads", tags=["ads"])
 
 @app.get("/")
 def root():

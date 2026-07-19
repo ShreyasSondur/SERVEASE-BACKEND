@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
     
     # Database
-    SQLALCHEMY_DATABASE_URI: str = os.getenv("DATABASE_URL", "postgresql://neondb_owner:[REDACTED]@ep-red-forest-atp4b3kl.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require")
+    SQLALCHEMY_DATABASE_URI: str = os.getenv("DATABASE_URL", "sqlite:///./servease.db")
     
     # Admin Credentials
     ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@servease.com")
