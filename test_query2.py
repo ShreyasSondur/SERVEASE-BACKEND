@@ -1,0 +1,1 @@
+from app.db.session import SessionLocal; from app.api.routes.admin import get_search_history; db = SessionLocal(); print(get_search_history(time_period="This Week", emirate="Dubai", db=db, current_admin=None))

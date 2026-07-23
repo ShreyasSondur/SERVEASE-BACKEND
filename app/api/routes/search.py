@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session, joinedload
 from app.api.dependencies import get_db, get_current_user_optional
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.business import Service
 from app.models.partner import PartnerProfile, PartnerStatus
 from app.schemas.business import Service as ServiceSchema, PaginatedServiceResponse
@@ -48,17 +48,26 @@ def search_services(
         query = query.order_by(Service.title.asc())
     elif sort == "alpha_desc":
         query = query.order_by(Service.title.desc())
+    elif sort == "oldest":
+        query = query.order_by(Service.created_at.asc())
+    else:
+        query = query.order_by(Service.created_at.desc())
 
-    # Log the search with the authenticated user ID if available
-    search_log = SearchHistory(
-        user_id=current_user.id if current_user else None,
-        emirate_id=emirate_id,
-        city_id=city_id,
-        category_id=category_id,
-        search_query=q
-    )
-    db.add(search_log)
-    db.commit()
+    # Log the search in search history (skip admins)
+    if not current_user or current_user.role != UserRole.ADMIN:
+        search_log = SearchHistory(
+            user_id=current_user.id if current_user else None,
+            user_role=current_user.role.value if (current_user and hasattr(current_user.role, 'value')) else (str(current_user.role) if current_user else None),
+            username=current_user.full_name if current_user else None,
+            email=current_user.email if current_user else None,
+            phone=current_user.phone_number if current_user else None,
+            emirate_id=emirate_id,
+            city_id=city_id,
+            category_id=category_id,
+            search_query=q
+        )
+        db.add(search_log)
+        db.commit()
         
     total = query.count()
     services = query.offset((page - 1) * limit).limit(limit).all()

@@ -23,6 +23,7 @@ class User(Base):
     is_banned = Column(Boolean, default=False)
     otp_code = Column(String, nullable=True)
     otp_expires_at = Column(DateTime, nullable=True)
+    phone_number = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     partner_profile = relationship("PartnerProfile", back_populates="user", uselist=False)

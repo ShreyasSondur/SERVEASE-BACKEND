@@ -163,6 +163,19 @@ def resend_otp(data: ResendOTP, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserSchema)
 def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+from pydantic import BaseModel
+
+class PhoneUpdate(BaseModel):
+    phone_number: str
+
+@router.put("/me/phone", response_model=UserSchema)
+def update_phone_number(data: PhoneUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    current_user.phone_number = data.phone_number
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
 import httpx
 from fastapi.responses import RedirectResponse
 import secrets

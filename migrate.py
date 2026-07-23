@@ -3,8 +3,12 @@ from sqlalchemy import text
 
 try:
     with engine.connect() as conn:
-        conn.execute(text('ALTER TABLE ad_configs ADD COLUMN redirect_url VARCHAR;'))
-        conn.commit()
-    print("Migration successful")
+        for col in ["user_role", "username", "email", "phone"]:
+            try:
+                conn.execute(text(f'ALTER TABLE search_history ADD COLUMN {col} VARCHAR;'))
+                conn.commit()
+                print(f"Migration successful: added {col} to search_history")
+            except Exception as e:
+                print(f"Migration failed or already applied for {col}: {e}")
 except Exception as e:
-    print(f"Migration failed or already applied: {e}")
+    print(f"Database connection failed: {e}")

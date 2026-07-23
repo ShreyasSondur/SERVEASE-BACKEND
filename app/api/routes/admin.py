@@ -25,7 +25,7 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: User = Depe
     deals_count = db.query(Deal).count()
     
     return {
-        "users": users_count,
+        "users": users_count + partners_count,
         "partners": partners_count,
         "services": services_count,
         "deals": deals_count
@@ -124,8 +124,16 @@ def ban_partner(partner_id: int, db: Session = Depends(get_db), current_user: Us
 # -----------------
 @router.get("/users")
 def list_users(db: Session = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
-    users = db.query(User).filter(User.role == UserRole.USER).all()
-    return [{"id": u.id, "email": u.email, "full_name": u.full_name, "is_active": u.is_active} for u in users]
+    users = db.query(User).filter(User.role.in_([UserRole.USER, UserRole.PARTNER])).all()
+    return [{
+        "id": u.id,
+        "email": u.email,
+        "full_name": u.full_name,
+        "is_active": u.is_active,
+        "phone_number": u.phone_number,
+        "role": u.role.value if hasattr(u.role, 'value') else u.role,
+        "created_at": u.created_at.isoformat() if u.created_at else None
+    } for u in users]
 
 # -----------------
 # Mod Management (Admin Only)
@@ -330,18 +338,53 @@ def delete_city(
 # -----------------
 # Analytics & Logs (Admin Only)
 # -----------------
-@router.get("/analytics/searches")
-def get_search_history(db: Session = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
-    searches = db.query(SearchHistory).all()
+@router.get("/search-history")
+def get_search_history(
+    time_period: Optional[str] = None,
+    emirate: Optional[str] = None,
+    db: Session = Depends(get_db), 
+    current_admin: User = Depends(get_current_active_admin)
+):
+    query = db.query(SearchHistory).options(
+        joinedload(SearchHistory.user),
+        joinedload(SearchHistory.category),
+        joinedload(SearchHistory.emirate),
+        joinedload(SearchHistory.city)
+    ).join(User, SearchHistory.user_id == User.id, isouter=True).filter(
+        (SearchHistory.user_role != "ADMIN") | (SearchHistory.user_role.is_(None)),
+        (User.role != UserRole.ADMIN) | (User.role.is_(None))
+    )
+    
+    if time_period:
+        now = datetime.now(timezone.utc)
+        if time_period == "Today":
+            query = query.filter(SearchHistory.timestamp >= now.replace(hour=0, minute=0, second=0, microsecond=0))
+        elif time_period == "This Week":
+            query = query.filter(SearchHistory.timestamp >= now - timedelta(days=7))
+        elif time_period == "This Month":
+            query = query.filter(SearchHistory.timestamp >= now - timedelta(days=30))
+        elif time_period == "This Year":
+            query = query.filter(SearchHistory.timestamp >= now - timedelta(days=365))
+            
+    if emirate and emirate != "All":
+        query = query.join(Emirate).filter(Emirate.name.ilike(f"%{emirate}%"))
+        
+    searches = query.all()
     return [{
         "id": s.id,
+        "user_id": s.user_id,
+        "user_role": s.user_role or (s.user.role.value if s.user else "Guest"),
+        "username": s.username or (s.user.full_name if s.user else "Guest"),
+        "email": s.email or (s.user.email if s.user else "Guest"),
+        "phone": s.phone or (s.user.phone_number if s.user else "Guest"),
         "query": s.search_query,
+        "category": s.category.name if s.category else "",
         "emirate": s.emirate.name if s.emirate else "",
         "city": s.city.name if s.city else "",
         "timestamp": s.timestamp
     } for s in searches]
 
-@router.get("/logs")
+@router.get("/activity-logs")
 def get_activity_logs(db: Session = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
     import re
     logs = db.query(ActivityLog).order_by(ActivityLog.timestamp.desc()).all()

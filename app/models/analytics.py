@@ -14,6 +14,11 @@ class SearchHistory(Base):
     search_query = Column(String, nullable=True)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    user_role = Column(String, nullable=True)
+    username = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+
     user = relationship("User")
     emirate = relationship("Emirate")
     city = relationship("City")
